@@ -30,9 +30,5 @@ COPY --from=builder /app/dist ./dist
 # Expose port
 EXPOSE 3001
 
-# Set default environment variables
-ENV PORT=3001
-ENV FASTIDIOUS_URL=http://localhost:3000
-
 # Start HTTP server
 CMD ["npm", "run", "start:http"]

@@ -3,15 +3,10 @@
 /**
  * Fastidious MCP HTTP Server
  *
- * HTTP-based MCP server that can be deployed and accessed remotely.
- * Uses SSE (Server-Sent Events) transport for MCP protocol.
- *
- * Environment variables:
- * - FASTIDIOUS_URL: Base URL of Fastidious API (default: http://localhost:3000)
- * - PORT: Server port (default: 3001)
+ * Supports both Streamable HTTP and SSE transports for mcp-remote compatibility.
  */
 
-import express from 'express'
+import express, { Request, Response as ExpressResponse } from 'express'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import {
@@ -21,11 +16,14 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js'
 
-const PORT = process.env.PORT || 3001
+const PORT = 3001
 const FASTIDIOUS_URL = process.env.FASTIDIOUS_URL || 'http://localhost:3000'
 
+// Store active transports by session ID
+const transports = new Map<string, SSEServerTransport>()
+
 // HTTP client for Fastidious API
-async function fetchAPI(token: string, path: string, options: RequestInit = {}): Promise<Response> {
+async function fetchAPI(token: string, path: string, options: RequestInit = {}): Promise<globalThis.Response> {
   const url = `${FASTIDIOUS_URL}${path}`
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${token}`,
@@ -45,7 +43,7 @@ const TOOLS = [
     name: 'create_note',
     description: 'Create a new note in Fastidious. Notes should be in Markdown format.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         title: { type: 'string', description: 'Title of the note' },
         content: { type: 'string', description: 'Content of the note in Markdown format' },
@@ -59,7 +57,7 @@ const TOOLS = [
     name: 'get_note',
     description: 'Get a specific note by ID with its full content',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: { id: { type: 'string', description: 'ID of the note to retrieve' } },
       required: ['id'],
     },
@@ -68,7 +66,7 @@ const TOOLS = [
     name: 'update_note',
     description: 'Update an existing note',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         id: { type: 'string', description: 'ID of the note to update' },
         title: { type: 'string', description: 'New title for the note' },
@@ -82,7 +80,7 @@ const TOOLS = [
     name: 'delete_note',
     description: 'Delete a note by ID',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: { id: { type: 'string', description: 'ID of the note to delete' } },
       required: ['id'],
     },
@@ -91,7 +89,7 @@ const TOOLS = [
     name: 'list_notes',
     description: 'List all notes, optionally filtered by collection',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: { collectionId: { type: 'string', description: 'Optional: Filter notes by collection ID' } },
     },
   },
@@ -99,7 +97,7 @@ const TOOLS = [
     name: 'search_notes',
     description: 'Search notes by content',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         query: { type: 'string', description: 'Search query to match against note content' },
         collectionId: { type: 'string', description: 'Optional: Limit search to a specific collection' },
@@ -111,7 +109,7 @@ const TOOLS = [
     name: 'create_collection',
     description: 'Create a new collection to organize notes',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         title: { type: 'string', description: 'Title of the collection' },
         items: { type: 'array', items: { type: 'string' }, description: 'Optional: Array of note IDs to include' },
@@ -124,7 +122,7 @@ const TOOLS = [
     name: 'get_collection',
     description: 'Get a collection by ID, optionally including full note contents',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         id: { type: 'string', description: 'ID of the collection to retrieve' },
         includeContents: { type: 'boolean', description: 'Whether to include full content of all notes', default: false },
@@ -135,13 +133,13 @@ const TOOLS = [
   {
     name: 'list_collections',
     description: 'List all collections',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: { type: 'object' as const, properties: {} },
   },
   {
     name: 'add_to_collection',
     description: 'Add notes to an existing collection',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         collectionId: { type: 'string', description: 'ID of the collection' },
         noteIds: { type: 'array', items: { type: 'string' }, description: 'Array of note IDs to add' },
@@ -153,7 +151,7 @@ const TOOLS = [
     name: 'remove_from_collection',
     description: 'Remove notes from a collection',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         collectionId: { type: 'string', description: 'ID of the collection' },
         noteIds: { type: 'array', items: { type: 'string' }, description: 'Array of note IDs to remove' },
@@ -176,7 +174,7 @@ function createMCPServer(token: string): Server {
     const { name, arguments: args } = request.params
 
     try {
-      let response: Response
+      let response: globalThis.Response
       let result: unknown
 
       switch (name) {
@@ -280,7 +278,7 @@ function createMCPServer(token: string): Server {
       }
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -293,8 +291,9 @@ function createMCPServer(token: string): Server {
 
 // Express app
 const app = express()
+app.use(express.json())
 
-// CORS for Claude Desktop
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*')
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -306,30 +305,66 @@ app.use((req, res, next) => {
 })
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', version: '1.0.0' })
 })
 
-// SSE endpoint for MCP
-// Token is passed as query parameter: /sse?token=fst_xxx
-app.get('/sse', async (req, res) => {
+// SSE endpoint for MCP - handles GET requests
+app.get('/sse', async (req: Request, res: ExpressResponse) => {
   const token = req.query.token as string
 
   if (!token || !token.startsWith('fst_')) {
     return res.status(401).json({ error: 'Valid token required as query parameter' })
   }
 
-  const transport = new SSEServerTransport('/message', res)
+  console.log(`[SSE] New connection with token: ${token.substring(0, 20)}...`)
+
+  // Create transport - the path is where POST messages should go
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transport = new SSEServerTransport('/message', res as any)
+
+  // Store transport for message routing
+  const sessionId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
+  transports.set(sessionId, transport)
+
+  // Create and connect server
   const server = createMCPServer(token)
 
-  await server.connect(transport)
+  // Handle connection close
+  res.on('close', () => {
+    console.log(`[SSE] Connection closed: ${sessionId}`)
+    transports.delete(sessionId)
+  })
+
+  try {
+    await server.connect(transport)
+    console.log(`[SSE] Server connected: ${sessionId}`)
+  } catch (error) {
+    console.error(`[SSE] Connection error:`, error)
+    transports.delete(sessionId)
+  }
 })
 
-// Message endpoint for MCP
-app.post('/message', express.json(), async (req, res) => {
-  // This endpoint receives messages from the SSE transport
-  // The transport handles routing internally
-  res.json({ received: true })
+// Message endpoint for SSE transport
+app.post('/message', async (req: Request, res: ExpressResponse) => {
+  console.log(`[Message] Received:`, JSON.stringify(req.body).substring(0, 100))
+
+  // Find the most recent transport (simple approach for single-user)
+  const transportEntries = Array.from(transports.entries())
+  if (transportEntries.length === 0) {
+    return res.status(400).json({ error: 'No active SSE connection' })
+  }
+
+  // Use the most recent transport
+  const [_sessionId, transport] = transportEntries[transportEntries.length - 1]
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await transport.handlePostMessage(req as any, res as any)
+  } catch (error) {
+    console.error(`[Message] Error handling message:`, error)
+    res.status(500).json({ error: 'Failed to handle message' })
+  }
 })
 
 // Start server
@@ -338,5 +373,6 @@ app.listen(PORT, () => {
   console.log(`Fastidious API URL: ${FASTIDIOUS_URL}`)
   console.log(`\nEndpoints:`)
   console.log(`  GET  /health - Health check`)
-  console.log(`  GET  /sse?token=YOUR_TOKEN - MCP SSE endpoint`)
+  console.log(`  GET  /sse?token=TOKEN - SSE endpoint for MCP`)
+  console.log(`  POST /message - Message endpoint for SSE transport`)
 })

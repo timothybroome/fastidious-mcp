@@ -9,6 +9,3 @@ cmds = ["npm run build"]
 
 [start]
 cmd = "npm run start:http"
-
-[variables]
-PORT = "3001"

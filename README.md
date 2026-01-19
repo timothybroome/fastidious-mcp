@@ -8,19 +8,18 @@ MCP (Model Context Protocol) server for Fastidious AI notes application.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | Server port | `3001` |
 | `FASTIDIOUS_URL` | Fastidious API base URL | `http://localhost:3000` |
 
 ### Deploy to Coolify
 
 1. Create a new service in Coolify
-2. Connect to this repository (or the standalone repo)
+2. Connect to this repository
 3. Set build pack to **Nixpacks** or **Dockerfile**
-4. Configure environment variables:
+4. Configure environment variable:
    ```
-   PORT=3001
    FASTIDIOUS_URL=https://blog.tjb.app
    ```
+   Or for internal Docker network: `FASTIDIOUS_URL=http://fastidious:3000`
 5. Set the domain to `mcp.tjb.app`
 6. Deploy
 
@@ -41,13 +40,16 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "fastidious": {
-      "url": "https://mcp.tjb.app/sse?token=YOUR_TOKEN_HERE"
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.tjb.app/sse?token=YOUR_TOKEN_HERE"]
     }
   }
 }
 ```
 
 Get your token from Fastidious AI Settings (sidebar → profile → Settings).
+
+Note: Uses `mcp-remote` to proxy the remote SSE connection.
 
 ### Local Development (stdio mode)
 
