@@ -95,7 +95,7 @@ app.post('/message', async (req: Request, res: ExpressResponse) => {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await transport.handlePostMessage(req as any, res as any)
+    await transport.handlePostMessage(req as any, res as any, req.body)
   } catch (error) {
     console.error(`[Message] Error handling message:`, error)
     res.status(500).json({ error: 'Failed to handle message' })
