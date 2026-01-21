@@ -31,6 +31,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# build output
+/dist
+
 # generated version file
 /public/version.json
 mcp-server/node_modules

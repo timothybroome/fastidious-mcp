@@ -28,7 +28,7 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 
 # Expose port
-EXPOSE 3001
+EXPOSE 3000
 
 # Start HTTP server
 CMD ["npm", "run", "start:http"]

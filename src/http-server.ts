@@ -18,7 +18,7 @@ import express, { Request, Response as ExpressResponse } from 'express'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { createMCPServer } from './tools.js'
 
-const PORT = parseInt(process.env.PORT || '3001', 10)
+const PORT = parseInt(process.env.PORT || '3000', 10)
 const FASTIDIOUS_URL = process.env.FASTIDIOUS_URL || 'http://localhost:3000'
 
 // Store active transports by session ID
